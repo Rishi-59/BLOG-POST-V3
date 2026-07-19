@@ -110,6 +110,13 @@ Comment (comments table)
 - Type hints throughout the codebase
 - DRY principle with reusable edit form for both create and edit operations
 
+### 13. **Python Dependency Management with uv** ⭐
+- **uv** is a modern Python package manager that's significantly faster than pip
+- Uses `uv.lock` file for reproducible, consistent dependency resolution
+- Lock files ensure all developers and CI/CD environments use identical package versions
+- Faster sync times with `uv sync` compared to `pip install`
+- Best practice: commit `uv.lock` to version control for dependency tracking
+
 ## 🛠️ Tech Stack
 - **Backend**: Flask, SQLAlchemy ORM
 - **Database**: SQLite
@@ -118,9 +125,10 @@ Comment (comments table)
 - **Rich Text Editor**: CKEditor
 - **Frontend Framework**: Bootstrap 5
 - **Utilities**: Flask-Gravatar, Flask-CKEditor
+- **Package Manager**: uv (with pip fallback)
 
 ## 📦 Dependencies
-See `requirements.txt` for all dependencies. Key packages:
+See `requirements.txt` for all dependencies and `uv.lock` for pinned versions. Key packages:
 - Flask
 - Flask-SQLAlchemy
 - Flask-Login
@@ -130,6 +138,26 @@ See `requirements.txt` for all dependencies. Key packages:
 - Flask-Gravatar
 
 ## 🚀 Running the Application
+
+### Option 1: Using uv (Recommended - Faster & Reproducible) ⭐
+```bash
+# Install uv if you haven't already
+# macOS/Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (via pip):
+pip install uv
+
+# Install dependencies using uv.lock for reproducible builds
+uv sync
+
+# Run the app
+python main.py
+
+# Access at http://localhost:5002
+```
+
+### Option 2: Using pip
 ```bash
 # Install dependencies
 pip3 install -r requirements.txt
@@ -149,3 +177,4 @@ python main.py
 - Flask extension patterns
 - Route protection with decorators
 - Form validation and CSRF protection
+- Modern Python dependency management with lock files
