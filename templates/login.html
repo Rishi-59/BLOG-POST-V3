@@ -21,14 +21,12 @@ include "header.html" %}
 <main class="mb-4">
   <div class="container">
     <div class="row">
-      <!-- TODO: add a flash message here for users registering twice -->
       {% with messages = get_flashed_messages() %}
           {% if messages %}
-              <p>{{ messages[-1] }}</p>
+              <error style="text-align: center; color: darkred">{{ messages[-1] }}</error>
           {% endif %}
         {% endwith %}
       <div class="col-lg-8 col-md-10 mx-auto">
-        <!--TODO: render login form here-->
         {{ render_form(form) }}
       </div>
     </div>

@@ -21,8 +21,12 @@ include "header.html" %}
 <main class="mb-4">
   <div class="container">
     <div class="row">
+      {% with messages = get_flashed_messages() %}
+          {% if messages %}
+              <error style="text-align: center; color: darkred">{{ messages[-1] }}</error>
+          {% endif %}
+        {% endwith %}
       <div class="col-lg-8 col-md-10 mx-auto">
-        <!--TODO: render your registration form here-->
         {{render_form(form)}}
       </div>
     </div>

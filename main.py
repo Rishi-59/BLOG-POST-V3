@@ -12,7 +12,7 @@ from sqlalchemy import Integer, String, Text, ForeignKey
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
-from forms import CreatePostForm, RegisterForm, LoginForm
+from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 
 '''
 Make sure the required packages are installed: 
@@ -61,9 +61,8 @@ class BlogPost(db.Model):
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     author: Mapped["User"] = relationship(back_populates="blog_posts")
 
-    @property
-    def is_admin(self):
-        return self.id == 1
+    comments: Mapped[List["Comment"]] = relationship(back_populates="post")
+
 
 
 # TODO: Create a User table for all your registered users.
@@ -76,6 +75,24 @@ class User(UserMixin, db.Model):
     password: Mapped[str] = mapped_column(String(250), nullable=False)
 
     blog_posts: Mapped[List["BlogPost"]] = relationship(back_populates="author")
+    comments: Mapped[List["Comment"]] = relationship(back_populates="author")
+
+    @property
+    def is_admin(self):
+        return self.id == 1
+
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    text: Mapped[str] = mapped_column(String(250), nullable=False)
+
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    author: Mapped["User"] = relationship(back_populates="comments")
+
+    post_id: Mapped[int] = mapped_column(ForeignKey("blog_posts.id"))
+    post: Mapped["BlogPost"] = relationship(back_populates="comments")
 
 
 with app.app_context():
@@ -106,7 +123,7 @@ def _get_user_by_email(email):
 def admin_only(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.is_admin:
+        if not current_user.is_authenticated or not current_user.is_admin:
             return abort(403)
         return f(*args, **kwargs)
 
@@ -178,8 +195,10 @@ def login():
 
         if user is None:
             flash("User not found! Please register first.", "danger")
+            return redirect(url_for("register"))
         else:
-            flash("Invalid username or password!", "danger")
+            flash("Incorrect username or password!", "danger")
+            return redirect(url_for("login"))
 
     return render_template("login.html", form=form)
 
@@ -198,11 +217,29 @@ def get_all_posts():
 
 
 # TODO: Allow logged-in users to comment on posts
-@app.route("/post/<int:post_id>")
-@login_required
+@app.route("/post/<int:post_id>", methods=["GET", "POST"])
 def show_post(post_id):
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post)
+    form = CommentForm()
+
+    if form.validate_on_submit():
+        if current_user.is_authenticated:
+            comment = Comment(
+            text = form.comment.data,
+
+            author_id = current_user.id,
+            author = current_user,
+
+            post_id = requested_post.id,
+            post = requested_post
+            )
+
+            _add(comment)
+
+        else:
+            flash("You need to login first.", "danger")
+            return redirect(url_for("login"))
+    return render_template("post.html", post=requested_post , form=form)
 
 
 # TODO: Use a decorator so only an admin user can create a new post
@@ -219,8 +256,8 @@ def add_new_post():
             author=current_user,
             date=date.today().strftime("%B %d, %Y")
         )
-        db.session.add(new_post)
-        db.session.commit()
+        _add(new_post)
+
         return redirect(url_for("get_all_posts"))
     return render_template("make-post.html", form=form)
 
