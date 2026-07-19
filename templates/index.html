@@ -31,7 +31,6 @@
           Posted by
           <a href="#">{{post.author.username}}</a>
           on {{post.date}}
-          <!-- TODO: Only show delete button if user id is 1 (admin user) -->
           {% if current_user.is_admin %}
           <a href="{{url_for('delete_post', post_id=post.id) }}">✘</a>
           {% endif %}
@@ -42,7 +41,6 @@
       {% endfor %}
 
       <!-- New Post -->
-      <!-- TODO: Only show Create Post button if user id is 1 (admin user) -->
       {% if current_user.is_authenticated and current_user.is_admin%}
       <div class="d-flex justify-content-end mb-4">
         <a
