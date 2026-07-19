@@ -93,6 +93,16 @@ def _get_user_by_email(email):
     return user
 
 
+def admin_only(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.id != 1:
+            return abort(403)
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -148,8 +158,8 @@ def login():
         password = form.password.data
 
         user = (
-            _get_user_by_username(identifier.title())
-            or _get_user_by_email(identifier)
+                _get_user_by_username(identifier.title())
+                or _get_user_by_email(identifier)
         )
 
         if user and check_password_hash(user.password, password):
@@ -187,6 +197,7 @@ def show_post(post_id):
 
 # TODO: Use a decorator so only an admin user can create a new post
 @app.route("/new-post", methods=["GET", "POST"])
+@admin_only
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -206,6 +217,7 @@ def add_new_post():
 
 # TODO: Use a decorator so only an admin user can edit a post
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
+@admin_only
 def edit_post(post_id):
     post = db.get_or_404(BlogPost, post_id)
     edit_form = CreatePostForm(
@@ -228,6 +240,7 @@ def edit_post(post_id):
 
 # TODO: Use a decorator so only an admin user can delete a post
 @app.route("/delete/<int:post_id>")
+@admin_only
 def delete_post(post_id):
     post_to_delete = db.get_or_404(BlogPost, post_id)
     db.session.delete(post_to_delete)
