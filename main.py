@@ -1,17 +1,18 @@
 from datetime import date
-from flask import Flask, abort, render_template, redirect, url_for, flash
+from sqlite3 import IntegrityError
+
+from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
-from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
+from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Text
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
-from forms import CreatePostForm
-
+from forms import CreatePostForm, RegisterForm
 
 '''
 Make sure the required packages are installed: 
@@ -32,11 +33,15 @@ ckeditor = CKEditor(app)
 Bootstrap5(app)
 
 # TODO: Configure Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 
 # CREATE DATABASE
 class Base(DeclarativeBase):
     pass
+
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
@@ -54,17 +59,82 @@ class BlogPost(db.Model):
     img_url: Mapped[str] = mapped_column(String(250), nullable=False)
 
 
-# TODO: Create a User table for all your registered users. 
+# TODO: Create a User table for all your registered users.
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(250), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String(250), nullable=False, unique=True)
+    password: Mapped[str] = mapped_column(String(250), nullable=False)
 
 
 with app.app_context():
     db.create_all()
 
 
+# DATABASE OPERATION
+def _add(value):
+    try:
+        db.session.add(value)
+        db.session.commit()
+        return True
+    except IntegrityError:
+        db.session.rollback()
+        return False
+
+
+def _get_user_by_username(username):
+    user = User.query.filter_by(username=username).first()
+    return user
+
+
+def _get_user_by_email(email):
+    user = User.query.filter_by(email=email).first()
+    return user
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
 # TODO: Use Werkzeug to hash the user's password when creating a new user.
-@app.route('/register')
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    return render_template("register.html")
+    form = RegisterForm()
+    if form.validate_on_submit():
+        username = form.username.data.title()
+        password = form.password.data
+        email = form.email.data
+
+        hashed_password = generate_password_hash(
+            password,
+            method="pbkdf2:sha256:10",  # 10 iterations
+            salt_length=8
+        )
+
+        db_user = _get_user_by_username(username)
+        if db_user:
+            flash("Username already exists!", "danger")
+            return redirect(url_for('register'))
+
+        db_user = _get_user_by_email(email)
+        if db_user:
+            flash("Email already exists!", "danger")
+            return redirect(url_for('register'))
+
+        user = User(username=username, email=email, password=hashed_password)
+        result = _add(user)
+
+        if result:
+            login_user(user)
+            return redirect(url_for("get_all_posts"))
+
+        else:
+            flash("Invalid username or password!", "danger")
+            return redirect(url_for('register'))
+
+    return render_template("register.html", form=form)
 
 
 # TODO: Retrieve a user from the database based on their email. 
@@ -87,6 +157,7 @@ def get_all_posts():
 
 # TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>")
+@login_required
 def show_post(post_id):
     requested_post = db.get_or_404(BlogPost, post_id)
     return render_template("post.html", post=requested_post)
