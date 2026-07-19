@@ -12,7 +12,7 @@ from sqlalchemy import Integer, String, Text
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
-from forms import CreatePostForm, RegisterForm
+from forms import CreatePostForm, RegisterForm, LoginForm
 
 '''
 Make sure the required packages are installed: 
@@ -102,6 +102,7 @@ def load_user(user_id):
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()
+
     if form.validate_on_submit():
         username = form.username.data.title()
         password = form.password.data
@@ -109,42 +110,63 @@ def register():
 
         hashed_password = generate_password_hash(
             password,
-            method="pbkdf2:sha256:10",  # 10 iterations
+            method="pbkdf2:sha256:10",
             salt_length=8
         )
 
-        db_user = _get_user_by_username(username)
-        if db_user:
-            flash("Username already exists!", "danger")
-            return redirect(url_for('register'))
+        if _get_user_by_username(username):
+            flash("Username already exists! Please choose a different username.", "danger")
+            return render_template("register.html", form=form)
 
-        db_user = _get_user_by_email(email)
-        if db_user:
-            flash("Email already exists!", "danger")
-            return redirect(url_for('register'))
+        if _get_user_by_email(email):
+            flash("An account with this email already exists. Please login.", "warning")
+            return render_template("register.html", form=form)
 
-        user = User(username=username, email=email, password=hashed_password)
-        result = _add(user)
+        user = User(
+            username=username,
+            email=email,
+            password=hashed_password
+        )
 
-        if result:
+        if _add(user):
             login_user(user)
             return redirect(url_for("get_all_posts"))
 
-        else:
-            flash("Invalid username or password!", "danger")
-            return redirect(url_for('register'))
+        flash("Something went wrong. Please try again.", "danger")
+        return render_template("register.html", form=form)
 
     return render_template("register.html", form=form)
 
 
-# TODO: Retrieve a user from the database based on their email. 
-@app.route('/login')
+# TODO: Retrieve a user from the database based on their email.
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    return render_template("login.html")
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        identifier = form.username.data.strip()
+        password = form.password.data
+
+        user = (
+            _get_user_by_username(identifier.title())
+            or _get_user_by_email(identifier)
+        )
+
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            return redirect(url_for("get_all_posts"))
+
+        if user is None:
+            flash("User not found! Please register first.", "danger")
+        else:
+            flash("Invalid username or password!", "danger")
+
+    return render_template("login.html", form=form)
 
 
 @app.route('/logout')
 def logout():
+    logout_user()
     return redirect(url_for('get_all_posts'))
 
 
