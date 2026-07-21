@@ -1,3 +1,7 @@
+import os
+import smtplib
+
+from dotenv import load_dotenv
 from datetime import date
 from sqlite3 import IntegrityError
 from typing import List
@@ -14,6 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 
+load_dotenv()
 '''
 Make sure the required packages are installed: 
 Open the Terminal in PyCharm (bottom left). 
@@ -28,7 +33,7 @@ This will install the packages from the requirements.txt for this project.
 '''
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
+app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 ckeditor = CKEditor(app)
 Bootstrap5(app)
 
@@ -41,8 +46,21 @@ login_manager.init_app(app)
 class Base(DeclarativeBase):
     pass
 
+# MAIL FUNCTION
+AUTOMATION_EMAIL = os.environ['AUTOMATION_EMAIL']
+PASSWORD = os.environ['PASSWORD']
+PERSONAL_EMAIL = os.environ['PERSONAL_EMAIL']
+def send_email(details):
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as conn:
+        conn.starttls()
+        conn.login(AUTOMATION_EMAIL, PASSWORD)
+        conn.sendmail(
+            from_addr=AUTOMATION_EMAIL,
+            to_addrs=PERSONAL_EMAIL,
+            msg="Subject: Blog Website Automation Email!\n\n" + details,
+        )
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DB_URI']
 db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
@@ -293,9 +311,22 @@ def about():
     return render_template("about.html")
 
 
-@app.route("/contact")
+@app.route("/contact", methods=["GET", "POST"])
 def contact():
-    return render_template("contact.html")
+    if request.method == "GET":
+        return render_template("contact.html")
+    name = request.form['name']
+    email = request.form['email']
+    phone = request.form['phone']
+    message = request.form['message']
+    details = f"""
+    Name: {name}
+    Email: {email}
+    Phone: {phone}
+    Message: {message}
+    """
+    send_email(details)
+    return render_template("contact.html", msg_sent=True)
 
 
 if __name__ == "__main__":
